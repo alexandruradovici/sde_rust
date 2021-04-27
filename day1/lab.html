@@ -1,0 +1,303 @@
+---
+
+# Homework 1 .top_image[![Work In Progress](../images/work_in_progress.png)]
+
+Make the source code work:
+
+```rust
+struct Complex {
+    r: f64,
+    i: f64
+}
+
+fn main () {
+    let n1 = Complex::new (2, 3);
+    let n2 = Complex::new (-2, 3);
+    let n3 = Complex::new (2, -3);
+    let n4 = Complex::new (3, 0);
+    let n5 = Complex::new (0, 3);
+
+    println! ("The number is {}", n1); // prints 2+3i
+    println! ("The number is {}", n2); // prints -2+3i
+    println! ("The number is {}", n3); // prints 2-3i
+    println! ("The number is {}", n4); // prints 3
+    println! ("The number is {}", n5); // prints 3i
+
+    println! ("The number is {}", n1-n1); // prints 0
+    println! ("The number is {}", n1+n2); 
+    println! ("The number is {}", n1-n2);
+    println! ("The number is {}", n1*n2);
+}
+```
+  - Hint: use the Display, Add, Sub and Mul traits. 
+  - Read the compiler hints carefully.
+
+---
+# Deriving
+
+- Many traits are so straightforward that the compiler can often implement them
+  for you.
+- A `#[derive(...)]` attribute tells the compiler to insert a default
+  implementation for whatever traits you tell it to.
+- This removes the tedium of repeatedly manually implementing traits like `Clone` yourself!
+
+```rust
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+struct Complex {
+    r: f64,
+    i: f64
+}
+```
+
+---
+## Derivable Traits
+
+- You can derive the following core traits:
+    - `Clone`, `Copy`, `Debug`, `Default`, `Eq`,
+    - `Hash`, `Ord`, `PartialEq`, `PartialOrd`.
+- Deriving custom traits is also supported! (e.g. see [`serde`](https://serde.rs/) and [`diesel`](http://diesel.rs/))
+- Careful: deriving a trait won't always work.
+    - Can only derive a trait on a data type when all of its members can have derived the trait.
+    - e.g., `Eq` can't be derived on a struct containing only `f32`s, since
+      `f32` is not `Eq`.
+
+---
+## Core traits
+
+- It's good to be familiar with the core traits.
+    - `Clone`, `Copy`
+    - `Debug`
+    - `Default`
+    - `Eq`, `PartialEq`
+    - `Hash`
+    - `Ord`, `PartialOrd`
+
+---
+### Clone
+
+```rust
+pub trait Clone: Sized {
+    fn clone(&self) -> Self;
+
+    fn clone_from(&mut self, source: &Self) { ... }
+}
+```
+- A trait which defines how to duplicate a value of type `T`.
+- This can solve ownership problems.
+    - You can clone an object rather than taking ownership or borrowing!
+- [Documentation](https://doc.rust-lang.org/std/clone/trait.Clone.html)
+
+---
+### Clone
+
+```rust
+#[derive(Clone)] // without this, Bar cannot derive Clone.
+struct Foo {
+    x: i32,
+}
+
+#[derive(Clone)]
+struct Bar {
+    x: Foo,
+}
+```
+
+---
+### Copy
+```rust
+pub trait Copy: Clone { }
+```
+- `Copy` denotes that a type has "copy semantics" instead of "move semantics."
+- Type must be able to be copied by copying bits (`memcpy`).
+    - Types that contain references _cannot_ be `Copy`.
+- Marker trait: does not implement any methods, but defines behavior instead.
+- [Documentation](https://doc.rust-lang.org/std/marker/trait.Copy.html)
+
+---
+### Debug
+
+```rust
+pub trait Debug {
+    fn fmt(&self, &mut Formatter) -> Result;
+}
+```
+
+- Defines output for the `{:?}` formatting option.
+- Generates debug output, not pretty printed.
+- Generally speaking, you should always derive this trait.
+
+```rust
+#[derive(Debug)]
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+let origin = Point { x: 0, y: 0 };
+println!("The origin is: {:?}", origin);
+// The origin is: Point { x: 0, y: 0 }
+```
+- [Documentation](https://doc.rust-lang.org/std/fmt/trait.Debug.html)
+
+---
+### Default
+
+```rust
+pub trait Default: Sized {
+    fn default() -> Self;
+}
+```
+- Defines a default value for a type.
+- Often can be derived, but sometimes it has to be implemented explicitly.
+- [Documentation](https://doc.rust-lang.org/std/default/trait.Default.html)
+
+---
+### Eq vs. PartialEq
+
+```rust
+pub trait PartialEq<Rhs: ?Sized = Self> {
+    fn eq(&self, other: &Rhs) -> bool;
+
+    // example of default trait method implementation
+    fn ne(&self, other: &Rhs) -> bool { 
+        !self.eq (other)
+    }
+}
+
+pub trait Eq: PartialEq<Self> {}
+```
+- Traits for defining equality via the `==` operator.
+
+---
+### Eq vs. PartialEq
+
+- `PartialEq` represents a _partial equivalence relation_.
+    - Symmetric: if a == b then b == a
+    - Transitive: if a == b and b == c then a == c
+- `ne` has a default implementation in terms of `eq`.
+- `Eq` represents a _total equivalence relation_.
+    - Symmetric: if a == b then b == a
+    - Transitive: if a == b and b == c then a == c
+    - **Reflexive: a == a**
+- `Eq` does not define any additional methods.
+    - (It is also a Marker trait.)
+- For example, in floating point numbers `NaN != NaN`,
+    so floating point types implement `PartialEq` but not `Eq`.
+
+---
+### Ord vs. PartialOrd
+
+```rust
+pub trait PartialOrd<Rhs: ?Sized = Self>: PartialEq<Rhs> {
+    // Ordering is one of Less, Equal, Greater
+    fn partial_cmp(&self, other: &Rhs) -> Option<Ordering>;
+
+    fn lt(&self, other: &Rhs) -> bool { ... }
+    fn le(&self, other: &Rhs) -> bool { ... }
+    fn gt(&self, other: &Rhs) -> bool { ... }
+    fn ge(&self, other: &Rhs) -> bool { ... }
+}
+```
+- Traits for values that can be compared for a sort-order.
+
+---
+### Ord vs. PartialOrd
+
+- The comparison must satisfy, for all `a`, `b` and `c`:
+  - Antisymmetry: if `a < b` then `!(a > b)`, as well as `a > b` implying `!(a < b)`; and
+  - Transitivity: `a < b` and `b < c` implies `a < c`. The same must hold for both `==` and `>`.
+- `lt`, `le`, `gt`, `ge` have default implementations based on `partial_cmp`.
+
+---
+### Ord vs. PartialOrd
+
+```rust
+pub trait Ord: Eq + PartialOrd<Self> {
+    fn cmp(&self, other: &Self) -> Ordering;
+}
+```
+- Trait for types that form a total order.
+- An order is a total order if it is (for all `a`, `b` and `c`):
+  - total and antisymmetric: exactly one of `a < b`, `a == b` or `a > b` is true; and
+  - transitive, `a < b` and `b < c` implies `a < c`. The same must hold for both `==` and `>`.
+- For example, for floating point numbers, `NaN < 0 == false` and `NaN >= 0 == false` (cf. IEEE 754-2008 section 5.11).
+- See `std::cmp` [documentation](https://doc.rust-lang.org/std/cmp/index.html) for more information.
+
+---
+### Hash
+
+```rust
+pub trait Hash {
+    fn hash<H: Hasher>(&self, state: &mut H);
+
+    fn hash_slice<H: Hasher>(data: &[Self], state: &mut H)
+        where Self: Sized { ... }
+}
+```
+- A hashable type.
+- The `H` type parameter is an abstract hash state used to compute the hash.
+- If you also implement `Eq`, there is an additional, important property:
+```rust
+k1 == k2 -> hash(k1) == hash(k2)
+```
+- [Documentation](https://doc.rust-lang.org/std/hash/trait.Hash.html)
+
+---
+
+# Homework 2 .top_image[![Work In Progress](../images/work_in_progress.png)]
+
+Make the source code work:
+
+```rust
+struct Complex {
+    r: f64,
+    i: f64
+}
+
+fn main () {
+    let n1 = Complex::new (2, 3);
+    let n2 = Complex::new (-2, 3);
+    let n3 = Complex::new (2, -3);
+    let n4 = Complex::new (3, 0);
+    let n5 = Complex::new (0, 3);
+
+    println! ("The number is {}", n1); // prints 2+3i
+    println! ("The number is {}", n2); // prints -2+3i
+    println! ("The number is {}", n3); // prints 2-3i
+    println! ("The number is {}", n4); // prints 3
+    println! ("The number is {}", n5); // prints 3i
+
+    println! ("The number is {}", n1-n1); // prints 0
+    println! ("The number is {}", n1+n2); 
+    println! ("The number is {}", n1-n2);
+    println! ("The number is {}", n1*n2);
+    println! ("The numbers {} and {} are {}", n1, n2, if n1==n2 { "equal"} else {"not equal"});
+}
+```
+  - Hint: use the source from the previous workpoint, look at the `PartialEq` traits. 
+  - Read the compiler hints carefully.
+
+---
+
+# Homework 3 .top_image[![Work In Progress](../images/work_in_progress.png)]
+
+Find a way to order these numbers and make the source work.
+```rust
+struct Complex {
+    r: f64,
+    i: f64
+}
+
+fn main () {
+    let n1 = Complex::new (2, 3);
+    let n2 = Complex::new (-2, 3);
+
+    println! ("The number is {}", n1); // prints 2+3i
+    println! ("The number is {}", n2); // prints -2+3i
+
+    println! ("The number is {}", n1<n2);
+    println! ("The number is {}", n1<=n2); 
+    println! ("The number is {}", n1>n2);
+    println! ("The number is {}", n1>=n2);
+}
+```
